@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file. See [commit-and-tag-version](https://github.com/absolute-version/commit-and-tag-version) for commit guidelines.
 
+## 0.5.0 (2026-10-22)
+
+Fork changes (kerupu526/dsh-ssh):
+
+### Features
+
+* **client:** Korean and English UI through the DSH locale service
+* **subprocess:** route `spawn`/`spawnTerminal` over SSH from the mounted local `subprocess` service instead of registering a second one; peel the Windows sandbox runner and PowerShell layers into `bash -c`
+* **fs:** route `ssh://` paths and live route placeholders over SFTP from the mounted local `fs` service
+* **preset:** `remote` agent preset (bash tool) and `/remote`, `/local` commands
+
+### Bug Fixes
+
+* **fs:** a path under the route-placeholder root that names no live connection (for example `.git`) stays local
+* **connection:** keep post-ready socket errors (`ECONNRESET`) from crashing the host
+
 ## 0.4.2 (2026-10-20)
 
 ### Documentation

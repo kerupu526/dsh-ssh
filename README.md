@@ -1,6 +1,6 @@
 # dsh-ssh
 
-English | [中文](README.zh.md)
+English | [한국어](README.ko.md) | [中文](README.zh.md)
 
 <p align="center">
   <img src="https://img.shields.io/npm/v/dsh-ssh" alt="npm version">
@@ -48,7 +48,7 @@ Only needed when composing providers by hand (`cordis.yml`):
 | `readyTimeout` `keepaliveInterval` `keepaliveCountMax` | 45000 / 0 / 3 | milliseconds |
 | `strictHostKeyChecking` `knownHosts` | false / `[]` | host-key verification |
 
-> **Web profile:** `subprocess` and `fs` are single-slot services. Disable the local providers (`dsh-subprocess-local`, `dsh-fs-sandbox`) in the profile patch, or remote work silently runs on the harness host.
+> **Local + remote:** `subprocess` and `fs` are single-slot services, so this build keeps the mounted local providers and routes only SSH calls (an `ssh://` path, or a working directory that names a live connection) to the remote host. Local workspaces stay local; no profile patch is needed. On a Windows host, pick the `remote` agent preset (or run `/remote` before the first message) so the agent uses bash instead of PowerShell.
 
 ## Limitations
 
