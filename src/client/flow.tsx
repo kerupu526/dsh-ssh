@@ -34,6 +34,7 @@ import {
   TrashIcon,
 } from './icons.tsx'
 import styles from './flow.module.css'
+import { t } from './i18n.ts'
 
 /** Services the plugin injects into every registration. */
 export interface FlowInjected {
@@ -266,38 +267,38 @@ function asAddedView(value: unknown): ConnectionView {
 function describeRemoteFailure(raw: string): RemoteFailure {
   if (/invalid_union/.test(raw)) {
     return {
-      title: '无法创建远程会话',
-      text: '宿主返回了无法解析的错误响应——最常见的原因是 SSH 连接失败。请检查该主机的认证与网络配置后重试。',
+      title: t("无法创建远程会话"),
+      text: t("宿主返回了无法解析的错误响应——最常见的原因是 SSH 连接失败。请检查该主机的认证与网络配置后重试。"),
       needsAuth: false,
     }
   }
   if (/all configured authentication methods/i.test(raw)) {
     return {
-      title: '认证失败',
-      text: '该主机没有可用的私钥或密码，SSH 服务器拒绝了登录。可点击「补全认证」，在表单中填写认证信息后重试。',
+      title: t("认证失败"),
+      text: t("该主机没有可用的私钥或密码，SSH 服务器拒绝了登录。可点击「补全认证」，在表单中填写认证信息后重试。"),
       needsAuth: true,
     }
   }
   if (/cannot parse privatekey|cannot read private key|invalid private key|no key found/i.test(raw)) {
     return {
-      title: '私钥不可用',
-      text: `无法读取或解析私钥文件，请检查路径、口令与文件权限。原始错误：${raw}`,
+      title: t("私钥不可用"),
+      text: t("无法读取或解析私钥文件，请检查路径、口令与文件权限。原始错误：{0}", raw),
       needsAuth: true,
     }
   }
   if (/timed?\s?out|etimedout/i.test(raw)) {
-    return { title: '连接超时', text: '在超时前未能建立连接，请检查主机名、端口与网络可达性。', needsAuth: false }
+    return { title: t("连接超时"), text: t("在超时前未能建立连接，请检查主机名、端口与网络可达性。"), needsAuth: false }
   }
   if (/econnrefused/i.test(raw)) {
-    return { title: '连接被拒绝', text: '目标端口未开放或拒绝了连接，请核对端口。', needsAuth: false }
+    return { title: t("连接被拒绝"), text: t("目标端口未开放或拒绝了连接，请核对端口。"), needsAuth: false }
   }
   if (/enotfound|getaddrinfo|dns/i.test(raw)) {
-    return { title: '找不到主机', text: '域名解析失败，请核对主机名或修正 ~/.ssh/config 中的 HostName。', needsAuth: false }
+    return { title: t("找不到主机"), text: t("域名解析失败，请核对主机名或修正 ~/.ssh/config 中的 HostName。"), needsAuth: false }
   }
   if (/ehostunreach|enetunreach/i.test(raw)) {
-    return { title: '网络不可达', text: '本机无法路由到该主机，请检查网络或跳板配置。', needsAuth: false }
+    return { title: t("网络不可达"), text: t("本机无法路由到该主机，请检查网络或跳板配置。"), needsAuth: false }
   }
-  return { title: '无法连接远程主机', text: raw, needsAuth: false }
+  return { title: t("无法连接远程主机"), text: raw, needsAuth: false }
 }
 
 /** The directory-flow occupant registered into both workspace holes. */
@@ -411,7 +412,7 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
       // every bash/fs/terminal operation onto the remote host.
       const routed = unwrap(await rpc('session.route', { id: mode.id, path: pane.path }), 'session.route failed')
       const cwd = isRecord(routed) && typeof routed.cwd === 'string' ? routed.cwd : ''
-      if (cwd === '') throw new Error('session.route 未返回会话目录')
+      if (cwd === '') throw new Error(t("session.route 未返回会话目录"))
       onPicked(cwd)
     } catch (error) {
       const message = errorText(error)
@@ -584,7 +585,7 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
     setHostPending(host.alias)
     try {
       const resolved = asResolved(unwrap(await rpc('connections.resolve', { host: host.alias }), 'connections.resolve failed'))
-      if (resolved.host === '') throw new Error('别名解析结果为空')
+      if (resolved.host === '') throw new Error(t("别名解析结果为空"))
       if (resolved.username.trim() === '') {
         openForm({
           label: host.alias,
@@ -602,7 +603,7 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
       const message = errorText(error)
       if (isTransportError(message)) {
         connectionUi.markTransportFailure()
-        setHostError({ alias: host.alias, message: '连接中断，恢复后会自动重试' })
+        setHostError({ alias: host.alias, message: t("连接中断，恢复后会自动重试") })
       } else {
         setHostError({ alias: host.alias, message })
       }
@@ -627,7 +628,7 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
         ...(resolved.jump.length > 0 ? { jump: resolved.jump } : {}),
       })
       const view = asAddedView(unwrap(result, 'connections.add failed'))
-      if (view.id === '') throw new Error('注册结果缺少连接 id')
+      if (view.id === '') throw new Error(t("注册结果缺少连接 id"))
       setConfirmTarget(null)
       await refreshConnections(true)
       await refreshConfigHosts(true)
@@ -637,7 +638,7 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
       const message = errorText(error)
       if (isTransportError(message)) {
         connectionUi.markTransportFailure()
-        setHostError({ alias: host.alias, message: '连接中断，恢复后会自动重试' })
+        setHostError({ alias: host.alias, message: t("连接中断，恢复后会自动重试") })
       } else {
         setHostError({ alias: host.alias, message })
       }
@@ -659,7 +660,7 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
     const name = (folderDraft ?? '').trim()
     if (name === '' || pane.path === null) return
     if (name === '.' || name === '..' || /[/\\]/.test(name)) {
-      setFolderError('名称不能包含 / 或 \\，也不能是 . 或 ..')
+      setFolderError(t("名称不能包含 / 或 \\，也不能是 . 或 .."))
       return
     }
     setFolderBusy(true)
@@ -676,7 +677,7 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
       const message = errorText(error)
       if (isTransportError(message)) {
         connectionUi.markTransportFailure()
-        setFolderError('连接中断，恢复后重试')
+        setFolderError(t("连接中断，恢复后重试"))
       } else {
         setFolderError(message)
       }
@@ -700,7 +701,7 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
       const message = errorText(error)
       if (isTransportError(message)) {
         connectionUi.markTransportFailure()
-        setConnectionsError('连接中断，恢复后会自动重试')
+        setConnectionsError(t("连接中断，恢复后会自动重试"))
       } else {
         setConnectionsError(message)
       }
@@ -717,7 +718,7 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
       const message = errorText(error)
       if (isTransportError(message)) {
         connectionUi.markTransportFailure()
-        throw new Error('连接中断，恢复后重试')
+        throw new Error(t("连接中断，恢复后重试"))
       }
       throw error
     }
@@ -728,7 +729,7 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
     if (result.ok) return { ok: true }
     if (isTransportError(result.error.message)) {
       connectionUi.markTransportFailure()
-      return { ok: false, message: '连接中断，恢复后重试' }
+      return { ok: false, message: t("连接中断，恢复后重试") }
     }
     return { ok: false, message: result.error.message }
   }
@@ -738,7 +739,7 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
     if (!result.ok) {
       if (isTransportError(result.error.message)) {
         connectionUi.markTransportFailure()
-        return { ok: false, message: '连接中断，恢复后重试' }
+        return { ok: false, message: t("连接中断，恢复后重试") }
       }
       return { ok: false, message: result.error.message }
     }
@@ -761,31 +762,31 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
   const lastCrumbIndex = crumbs.length - 1
 
   const subtitleBase = mode.kind === 'local'
-    ? '选择一个本机目录作为新工作区'
-    : `正在浏览 ${activeConnection !== undefined ? `${activeConnection.username}@${activeConnection.host}:${activeConnection.port}` : mode.id} 的远程目录`
+    ? t("选择一个本机目录作为新工作区")
+    : t("正在浏览 {0} 的远程目录", activeConnection !== undefined ? `${activeConnection.username}@${activeConnection.host}:${activeConnection.port}` : mode.id)
   const subtitleText = uiPhase === 'connecting'
-    ? (slow ? '连接较慢，仍在尝试…' : '正在连接 DSH…')
+    ? (slow ? t("连接较慢，仍在尝试…") : t("正在连接 DSH…"))
     : uiPhase === 'reconnecting'
-      ? '连接已断开，正在自动重连… · 显示上次同步的数据'
+      ? t("连接已断开，正在自动重连… · 显示上次同步的数据")
       : uiPhase === 'recovered'
-        ? '已恢复连接，正在刷新…'
+        ? t("已恢复连接，正在刷新…")
         : subtitleBase
   const pillText = uiPhase === 'connecting'
-    ? (slow ? '连接较慢…' : '正在连接…')
+    ? (slow ? t("连接较慢…") : t("正在连接…"))
     : uiPhase === 'reconnecting'
-      ? '重连中…'
+      ? t("重连中…")
       : uiPhase === 'recovered'
-        ? '已恢复'
-        : '已连接'
+        ? t("已恢复")
+        : t("已连接")
   const footerHint = uiPhase === 'connecting'
-    ? (slow ? '连接较慢，仍在尝试…' : '正在连接 DSH…')
+    ? (slow ? t("连接较慢，仍在尝试…") : t("正在连接 DSH…"))
     : uiPhase === 'reconnecting'
-      ? '连接恢复后自动刷新，当前操作已暂停'
+      ? t("连接恢复后自动刷新，当前操作已暂停")
       : uiPhase === 'recovered'
-        ? '已恢复连接，正在刷新…'
+        ? t("已恢复连接，正在刷新…")
         : pane.path === null
-          ? '选择目录后创建会话'
-          : `将使用 ${pane.path}`
+          ? t("选择目录后创建会话")
+          : t("将使用 {0}", pane.path)
 
   /** The translated remote failure for the right pane, when there is one. */
   const paneBusinessError = pane.error !== null && !isTransportError(pane.error)
@@ -798,15 +799,15 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
 
   return (
     <div className={styles.overlay} onClick={(event) => { if (event.target === event.currentTarget) onCancel() }}>
-      <div className={styles.dialog} data-connection={uiPhase} role="dialog" aria-modal="true" aria-label="选择工作区目录" ref={dialogRef}>
+      <div className={styles.dialog} data-connection={uiPhase} role="dialog" aria-modal="true" aria-label={t("选择工作区目录")} ref={dialogRef}>
         <div className={styles.connProgress} aria-hidden="true" />
         <header className={styles.header}>
           <div className={styles.headerText}>
-            <h3 className={styles.title}>选择工作区目录</h3>
+            <h3 className={styles.title}>{t("选择工作区目录")}</h3>
             <p className={styles.subtitle}>
               <span className={uiPhase === 'reconnecting' ? styles.subtitleStale : undefined}>{subtitleText}</span>
               {uiPhase === 'reconnecting' && connection?.reconnect !== undefined && (
-                <button type="button" className={styles.linkButton} onClick={connectionUi.reconnect}>立即重连</button>
+                <button type="button" className={styles.linkButton} onClick={connectionUi.reconnect}>{t("立即重连")}</button>
               )}
               {uiPhase === 'connecting' && slow && (
                 <button
@@ -818,7 +819,7 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
                     refreshCurrent()
                   }}
                 >
-                  重试
+                  {t("重试")}
                 </button>
               )}
             </p>
@@ -829,14 +830,14 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
             {uiPhase === 'recovered' && <CheckIcon className={styles.pillIcon} />}
             <span>{pillText}</span>
           </div>
-          <button type="button" className={styles.iconButton} aria-label="关闭" onClick={onCancel}>
+          <button type="button" className={styles.iconButton} aria-label={t("关闭")} onClick={onCancel}>
             <CloseIcon />
           </button>
         </header>
 
         <div className={styles.body}>
-          <nav className={styles.sidebar} aria-label="连接与位置">
-            <section className={styles.sidebarSection} aria-label="本机">
+          <nav className={styles.sidebar} aria-label={t("连接与位置")}>
+            <section className={styles.sidebarSection} aria-label={t("本机")}>
               <ul className={styles.connectionList} role="list">
                 <li className={cx(styles.connectionItem, mode.kind === 'local' && styles.connectionItemActive)}>
                   <button
@@ -848,9 +849,9 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
                   >
                     <MonitorIcon className={styles.connectionIcon} />
                     <span className={styles.connectionInfo}>
-                      <span className={styles.connectionLabel}>本机目录</span>
+                      <span className={styles.connectionLabel}>{t("本机目录")}</span>
                       <span className={styles.connectionDetail}>
-                        <span className={styles.connectionEndpoint}>选择本机目录作为工作区</span>
+                        <span className={styles.connectionEndpoint}>{t("选择本机目录作为工作区")}</span>
                       </span>
                     </span>
                   </button>
@@ -858,15 +859,15 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
               </ul>
             </section>
 
-            <section className={styles.sidebarSection} aria-label="已保存连接">
+            <section className={styles.sidebarSection} aria-label={t("已保存连接")}>
               <h4 className={styles.sidebarTitle}>
-                已保存连接
+                {t("已保存连接")}
                 {connections.length > 0 && <span className={styles.sidebarCount}>{connections.length}</span>}
-                {connectionUi.stale && <span className={styles.cacheTag}><ClockIcon />缓存</span>}
+                {connectionUi.stale && <span className={styles.cacheTag}><ClockIcon />{t("缓存")}</span>}
               </h4>
 
               {showConnectionsSkeleton && (
-                <div role="status" aria-label="正在加载已保存连接">
+                <div role="status" aria-label={t("正在加载已保存连接")}>
                   {[0, 1].map(index => (
                     <div key={index} className={styles.skeletonRow}>
                       <div className={styles.skeletonDot} />
@@ -884,7 +885,7 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
                   <span className={styles.sideErrorText}>{connectionsError}</span>
                   <button type="button" className={styles.retryButton} disabled={locked} onClick={() => { void refreshConnections() }}>
                     <RefreshIcon style={{ width: 12, height: 12 }} />
-                    重试
+                    {t("重试")}
                   </button>
                 </div>
               )}
@@ -892,8 +893,8 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
               {!showConnectionsSkeleton && !connectionUi.stale && connectionsError === null && connections.length === 0 && (
                 <div className={styles.sideEmpty}>
                   <ServerIcon className={styles.sideEmptyIcon} style={{ width: 18, height: 18 }} />
-                  <p className={styles.sideEmptyTitle}>还没有保存的连接</p>
-                  <p className={styles.sideEmptyText}>点右下角「＋」新建，或从下方 SSH 配置主机一键添加。</p>
+                  <p className={styles.sideEmptyTitle}>{t("还没有保存的连接")}</p>
+                  <p className={styles.sideEmptyText}>{t("点右下角「＋」新建，或从下方 SSH 配置主机一键添加。")}</p>
                 </div>
               )}
 
@@ -919,12 +920,12 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
                               </span>
                               <span className={styles.badge}>
                                 {connection.auth === 'password' ? <LockIcon style={{ width: 11, height: 11 }} /> : <KeyIcon style={{ width: 11, height: 11 }} />}
-                                {connection.auth === 'password' ? '密码' : connection.auth === 'agent' ? 'Agent' : '私钥'}
+                                {connection.auth === 'password' ? t("密码") : connection.auth === 'agent' ? 'Agent' : t("私钥")}
                               </span>
                               {connection.jumpHosts.length > 0 && (
                                 <span className={styles.badge} title={connection.jumpHosts.join(' → ')}>
                                   <RouteIcon style={{ width: 11, height: 11 }} />
-                                  跳板 ×{connection.jumpHosts.length}
+                                  {t("跳板 ×")}{connection.jumpHosts.length}
                                 </span>
                               )}
                             </span>
@@ -933,8 +934,8 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
                         <button
                           type="button"
                           className={styles.connectionRemove}
-                          aria-label={`删除连接 ${connection.label}`}
-                          title="删除连接"
+                          aria-label={t("删除连接 {0}", connection.label)}
+                          title={t("删除连接")}
                           disabled={locked}
                           onClick={() => { setDeleteTarget(connection) }}
                         >
@@ -947,15 +948,15 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
               )}
             </section>
 
-            <section className={styles.sidebarSection} aria-label="SSH 配置主机">
+            <section className={styles.sidebarSection} aria-label={t("SSH 配置主机")}>
               <h4 className={styles.sidebarTitle}>
-                SSH 配置主机
+                {t("SSH 配置主机")}
                 {configHosts.length > 0 && <span className={styles.sidebarCount}>{configHosts.length}</span>}
-                {connectionUi.stale && <span className={styles.cacheTag}><ClockIcon />缓存</span>}
+                {connectionUi.stale && <span className={styles.cacheTag}><ClockIcon />{t("缓存")}</span>}
               </h4>
 
               {showConfigSkeleton && (
-                <div role="status" aria-label="正在读取 ~/.ssh/config">
+                <div role="status" aria-label={t("正在读取 ~/.ssh/config")}>
                   {[0, 1].map(index => (
                     <div key={index} className={styles.skeletonRow}>
                       <div className={styles.skeletonDot} />
@@ -970,18 +971,18 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
 
               {configError !== null && !showConfigSkeleton && (
                 <div className={styles.sideError} role="alert">
-                  <span className={styles.sideErrorText}>无法读取 ~/.ssh/config：{configError}</span>
+                  <span className={styles.sideErrorText}>{t("无法读取 ~/.ssh/config：")}{configError}</span>
                   <button type="button" className={styles.retryButton} disabled={locked} onClick={() => { void refreshConfigHosts() }}>
                     <RefreshIcon style={{ width: 12, height: 12 }} />
-                    重试
+                    {t("重试")}
                   </button>
                 </div>
               )}
 
               {!showConfigSkeleton && !connectionUi.stale && configError === null && configHosts.length === 0 && (
                 <div className={styles.sideEmpty}>
-                  <p className={styles.sideEmptyTitle}>未发现 SSH 配置主机</p>
-                  <p className={styles.sideEmptyText}>在 ~/.ssh/config 中添加 Host 条目后，这里会直接列出，点击即可连接。</p>
+                  <p className={styles.sideEmptyTitle}>{t("未发现 SSH 配置主机")}</p>
+                  <p className={styles.sideEmptyText}>{t("在 ~/.ssh/config 中添加 Host 条目后，这里会直接列出，点击即可连接。")}</p>
                 </div>
               )}
 
@@ -999,10 +1000,10 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
                           aria-current="false"
                           disabled={hostPending !== null || locked}
                           title={registered !== undefined
-                            ? `已注册为 ${registered.username}@${registered.host}:${registered.port}`
+                            ? t("已注册为 {0}@{1}:{2}", registered.username, registered.host, registered.port)
                             : host.username !== ''
-                              ? `${host.username}@${host.host}:${host.port} — 点击注册并浏览`
-                              : '未指定用户 — 点击打开表单补全'}
+                              ? t("{0}@{1}:{2} — 点击注册并浏览", host.username, host.host, host.port)
+                              : t("未指定用户 — 点击打开表单补全")}
                           onClick={() => { void activateConfigHost(host) }}
                         >
                           <ServerIcon className={styles.connectionIcon} />
@@ -1012,32 +1013,32 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
                               {working ? (
                                 <span className={styles.hostWorking}>
                                   <SpinnerIcon className={cx(styles.spin, styles.hostSpinner)} />
-                                  正在添加并连接…
+                                  {t("正在添加并连接…")}
                                 </span>
                               ) : failed && hostError !== null ? (
-                                <span className={styles.hostErrorText} role="alert">添加失败：{hostError.message}</span>
+                                <span className={styles.hostErrorText} role="alert">{t("添加失败：")}{hostError.message}</span>
                               ) : (
                                 <>
                                   <span className={styles.connectionEndpoint}>
-                                    {host.username !== '' ? `${host.username}@${host.host}:${host.port}` : '未指定用户'}
+                                    {host.username !== '' ? `${host.username}@${host.host}:${host.port}` : t("未指定用户")}
                                   </span>
                                   {registered !== undefined ? (
                                     <span className={cx(styles.badge, styles.badgeAdded)}>
                                       <CheckIcon style={{ width: 11, height: 11 }} />
-                                      已添加
+                                      {t("已添加")}
                                     </span>
                                   ) : (
                                     <>
                                       {host.identityFile && (
                                         <span className={styles.badge}>
                                           <KeyIcon style={{ width: 11, height: 11 }} />
-                                          私钥
+                                          {t("私钥")}
                                         </span>
                                       )}
                                       {host.jump && (
                                         <span className={styles.badge}>
                                           <RouteIcon style={{ width: 11, height: 11 }} />
-                                          跳板
+                                          {t("跳板")}
                                         </span>
                                       )}
                                     </>
@@ -1057,8 +1058,8 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
             <button
               type="button"
               className={styles.sidebarAdd}
-              aria-label="新建连接"
-              title="新建连接"
+              aria-label={t("新建连接")}
+              title={t("新建连接")}
               disabled={locked}
               onClick={() => { openForm() }}
             >
@@ -1068,12 +1069,12 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
 
           <div className={styles.main}>
             <div className={styles.toolbar}>
-              <nav className={styles.crumbs} aria-label="当前路径">
+              <nav className={styles.crumbs} aria-label={t("当前路径")}>
                 <button
                   type="button"
                   className={styles.crumb}
-                  aria-label="回到主目录"
-                  title="主目录"
+                  aria-label={t("回到主目录")}
+                  title={t("主目录")}
                   disabled={locked || home === '' || pane.loading}
                   onClick={() => {
                     if (mode.kind === 'local') navigateLocal(home)
@@ -1102,27 +1103,27 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
                     </span>
                   ),
                 )}
-                {connectionUi.stale && <span className={styles.cacheTag}><ClockIcon />缓存</span>}
+                {connectionUi.stale && <span className={styles.cacheTag}><ClockIcon />{t("缓存")}</span>}
               </nav>
           <div className={styles.toolbarActions}>
             {mode.kind === 'local' && (
               <button
                 type="button"
                 className={cx(styles.toolButton, styles.toolButtonText)}
-                aria-label="用系统选择器选择文件夹"
-                title="打开系统文件夹选择器"
+                aria-label={t("用系统选择器选择文件夹")}
+                title={t("打开系统文件夹选择器")}
                 disabled={locked || nativePicking || busy}
                 onClick={() => { void pickNative() }}
               >
                 {nativePicking ? <SpinnerIcon className={styles.spin} /> : <FolderIcon style={{ width: 13, height: 13 }} />}
-                系统选择器
+                {t("系统选择器")}
               </button>
             )}
             <button
                   type="button"
                   className={styles.toolButton}
-                  aria-label="在当前目录新建文件夹"
-                  title="新建文件夹"
+                  aria-label={t("在当前目录新建文件夹")}
+                  title={t("新建文件夹")}
                   disabled={locked || pane.listing === null || pane.loading}
                   onClick={() => {
                     setFolderDraft('')
@@ -1135,8 +1136,8 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
                   type="button"
                   className={cx(styles.toolButton, showHidden && styles.toolButtonOn)}
                   aria-pressed={showHidden}
-                  aria-label={showHidden ? '隐藏以点开头的文件夹' : '显示以点开头的文件夹'}
-                  title={showHidden ? '隐藏点开头的文件夹' : '显示点开头的文件夹'}
+                  aria-label={showHidden ? t("隐藏以点开头的文件夹") : t("显示以点开头的文件夹")}
+                  title={showHidden ? t("隐藏点开头的文件夹") : t("显示点开头的文件夹")}
                   onClick={() => { setShowHidden(previous => !previous) }}
                 >
                   <EyeIcon />
@@ -1145,8 +1146,8 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
                 <button
                   type="button"
                   className={styles.toolButton}
-                  aria-label="刷新当前目录"
-                  title="刷新"
+                  aria-label={t("刷新当前目录")}
+                  title={t("刷新")}
                   disabled={locked || pane.loading || pane.listing === null}
                   onClick={refreshCurrent}
                 >
@@ -1160,7 +1161,7 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
               aria-busy={showPaneSkeleton}
             >
               {showPaneSkeleton && (
-                <div className={styles.skeletons} role="status" aria-label="正在加载目录">
+                <div className={styles.skeletons} role="status" aria-label={t("正在加载目录")}>
                   {[52, 78, 64, 90, 45, 71].map((width, index) => (
                     <div key={index} className={styles.skeleton} style={{ width: `${width}%` }} />
                   ))}
@@ -1172,12 +1173,12 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
                   <AlertIcon className={styles.errorIcon} />
                   <div className={styles.errorBody}>
                     <p className={styles.errorTitle}>
-                      {remoteFailure !== null ? remoteFailure.title : mode.kind === 'remote' ? '无法读取远程目录' : '无法读取目录'}
+                      {remoteFailure !== null ? remoteFailure.title : mode.kind === 'remote' ? t("无法读取远程目录") : t("无法读取目录")}
                     </p>
                     <p className={styles.errorText}>{remoteFailure !== null ? remoteFailure.text : pane.error}</p>
                     {pane.error !== null && (
                       <details className={styles.errorDetails}>
-                        <summary>查看详情</summary>
+                        <summary>{t("查看详情")}</summary>
                         <code>{pane.error}</code>
                       </details>
                     )}
@@ -1191,12 +1192,12 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
                         onClick={() => { openForm(draftFromConnection(activeConnection)) }}
                       >
                         <KeyIcon style={{ width: 12, height: 12 }} />
-                        补全认证
+                        {t("补全认证")}
                       </button>
                     )}
                     <button type="button" className={styles.retryButton} disabled={locked} onClick={refreshCurrent}>
                       <RefreshIcon style={{ width: 12, height: 12 }} />
-                      重试
+                      {t("重试")}
                     </button>
                   </div>
                 </div>
@@ -1205,11 +1206,11 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
               {pane.listing !== null && visibleEntries.length === 0 && !showPaneSkeleton && pane.error === null && (
                 <div className={styles.emptyState}>
                   <FolderIcon className={styles.emptyIcon} style={{ width: 22, height: 22 }} />
-                  <p className={styles.emptyTitle}>没有子文件夹</p>
+                  <p className={styles.emptyTitle}>{t("没有子文件夹")}</p>
                   <p className={styles.emptyText}>
                     {hiddenCount > 0 && !showHidden
-                      ? `另有 ${hiddenCount} 个点开头的文件夹未显示`
-                      : '可直接在此目录新建文件夹，或选择上方路径'}
+                      ? t("另有 {0} 个点开头的文件夹未显示", hiddenCount)
+                      : t("可直接在此目录新建文件夹，或选择上方路径")}
                   </p>
                 </div>
               )}
@@ -1237,7 +1238,7 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
               )}
 
               {pane.listing?.truncated === true && (
-                <p className={styles.truncated}>文件夹过多，仅显示开头部分。</p>
+                <p className={styles.truncated}>{t("文件夹过多，仅显示开头部分。")}</p>
               )}
             </div>
           </div>
@@ -1245,7 +1246,7 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
 
         <footer className={styles.footer}>
           <p className={styles.footerHint}>{footerHint}</p>
-          <button type="button" className={styles.button} disabled={busy} onClick={onCancel}>取消</button>
+          <button type="button" className={styles.button} disabled={busy} onClick={onCancel}>{t("取消")}</button>
           <button
             type="button"
             className={cx(styles.button, styles.primary)}
@@ -1257,31 +1258,31 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
             }}
           >
             {mode.kind === 'remote' && openingRemote && <SpinnerIcon className={styles.spin} />}
-            {mode.kind === 'remote' ? (openingRemote ? '连接中…' : '连接并打开') : '选择目录'}
+            {mode.kind === 'remote' ? (openingRemote ? t("连接中…") : t("连接并打开")) : t("选择目录")}
           </button>
         </footer>
       </div>
 
       {folderDraft !== null && (
         <div className={styles.overlay} onClick={(event) => { if (event.target === event.currentTarget && !folderBusy) setFolderDraft(null) }}>
-          <div className={styles.smallDialog} role="dialog" aria-modal="true" aria-label="新建文件夹" ref={folderDialogRef}>
-            <h3 className={styles.formTitle}>新建文件夹</h3>
+          <div className={styles.smallDialog} role="dialog" aria-modal="true" aria-label={t("新建文件夹")} ref={folderDialogRef}>
+            <h3 className={styles.formTitle}>{t("新建文件夹")}</h3>
             <p className={styles.createIn}>
-              位置：<span className={cx(styles.mono, styles.createPath)}>{activePath === '' ? '…' : activePath}</span>
+              {t("位置：")}<span className={cx(styles.mono, styles.createPath)}>{activePath === '' ? '…' : activePath}</span>
             </p>
             <input
               className={cx(styles.input, folderError !== null && styles.inputError)}
               value={folderDraft}
-              placeholder="未命名文件夹"
+              placeholder={t("未命名文件夹")}
               disabled={folderBusy || locked}
               onChange={(event) => { setFolderDraft(event.target.value) }}
               onKeyDown={(event) => { if (event.key === 'Enter' && !folderBusy && !locked) void confirmCreateFolder() }}
             />
             {folderError !== null && <p className={styles.fieldError} role="alert">{folderError}</p>}
-            {locked && <p className={styles.fieldHint}>连接恢复后可创建文件夹。</p>}
+            {locked && <p className={styles.fieldHint}>{t("连接恢复后可创建文件夹。")}</p>}
             <div className={styles.formActions}>
               <span className={styles.gap} />
-              <button type="button" className={styles.button} disabled={folderBusy} onClick={() => { setFolderDraft(null) }}>取消</button>
+              <button type="button" className={styles.button} disabled={folderBusy} onClick={() => { setFolderDraft(null) }}>{t("取消")}</button>
               <button
                 type="button"
                 className={cx(styles.button, styles.primary)}
@@ -1289,7 +1290,7 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
                 onClick={() => { void confirmCreateFolder() }}
               >
                 {folderBusy && <SpinnerIcon className={styles.spin} />}
-                创建
+                {t("创建")}
               </button>
             </div>
           </div>
@@ -1298,19 +1299,19 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
 
       {deleteTarget !== null && (
         <div className={styles.overlay} onClick={(event) => { if (event.target === event.currentTarget && removingId === null) setDeleteTarget(null) }}>
-          <div className={styles.smallDialog} role="dialog" aria-modal="true" aria-label="删除远程连接" ref={deleteDialogRef}>
+          <div className={styles.smallDialog} role="dialog" aria-modal="true" aria-label={t("删除远程连接")} ref={deleteDialogRef}>
             <div className={styles.confirmHead}>
               <span className={styles.confirmIconWrap}><TrashIcon /></span>
               <div>
-                <h3 className={styles.formTitle}>删除连接「{deleteTarget.label}」？</h3>
+                <h3 className={styles.formTitle}>{t("删除连接「")}{deleteTarget.label}{t("」？")}</h3>
                 <p className={styles.confirmText}>
-                  将移除 {deleteTarget.username}@{deleteTarget.host}:{deleteTarget.port} 的注册信息；删除后需要重新添加才能再次连接。
+                  {t("将移除")} {deleteTarget.username}@{deleteTarget.host}:{deleteTarget.port} {t("的注册信息；删除后需要重新添加才能再次连接。")}
                 </p>
               </div>
             </div>
             <div className={styles.formActions}>
               <span className={styles.gap} />
-              <button type="button" className={styles.button} disabled={removingId !== null} onClick={() => { setDeleteTarget(null) }}>取消</button>
+              <button type="button" className={styles.button} disabled={removingId !== null} onClick={() => { setDeleteTarget(null) }}>{t("取消")}</button>
               <button
                 type="button"
                 className={cx(styles.button, styles.danger)}
@@ -1318,7 +1319,7 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
                 onClick={() => { void confirmRemove() }}
               >
                 {removingId !== null && <SpinnerIcon className={styles.spin} />}
-                删除
+                {t("删除")}
               </button>
             </div>
           </div>
@@ -1327,21 +1328,21 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
 
       {confirmTarget !== null && (
         <div className={styles.overlay} onClick={(event) => { if (event.target === event.currentTarget && hostPending === null) setConfirmTarget(null) }}>
-          <div className={styles.smallDialog} role="dialog" aria-modal="true" aria-label="添加 SSH 配置主机" ref={confirmDialogRef}>
+          <div className={styles.smallDialog} role="dialog" aria-modal="true" aria-label={t("添加 SSH 配置主机")} ref={confirmDialogRef}>
             <div className={styles.confirmHead}>
               <span className={cx(styles.confirmIconWrap, styles.confirmIconInfo)}><ServerIcon /></span>
               <div>
-                <h3 className={styles.formTitle}>添加连接「{confirmTarget.host.alias}」？</h3>
+                <h3 className={styles.formTitle}>{t("添加连接「")}{confirmTarget.host.alias}{t("」？")}</h3>
                 <p className={styles.confirmText}>
-                  将把 {confirmTarget.resolved.username}@{confirmTarget.resolved.host}:{confirmTarget.resolved.port}
-                  {confirmTarget.resolved.jump.length > 0 ? `（经 ${String(confirmTarget.resolved.jump.length)} 级跳板）` : ''}
-                  保存到「已保存连接」，并打开它的远程目录。
+                  {t("将把")} {confirmTarget.resolved.username}@{confirmTarget.resolved.host}:{confirmTarget.resolved.port}
+                  {confirmTarget.resolved.jump.length > 0 ? t("（经 {0} 级跳板）", String(confirmTarget.resolved.jump.length)) : ''}
+                  {t("保存到「已保存连接」，并打开它的远程目录。")}
                 </p>
               </div>
             </div>
             <div className={styles.formActions}>
               <span className={styles.gap} />
-              <button type="button" className={styles.button} disabled={hostPending !== null} onClick={() => { setConfirmTarget(null) }}>取消</button>
+              <button type="button" className={styles.button} disabled={hostPending !== null} onClick={() => { setConfirmTarget(null) }}>{t("取消")}</button>
               <button
                 type="button"
                 className={cx(styles.button, styles.primary)}
@@ -1349,7 +1350,7 @@ export function SshWorkspaceFlow(props: FlowProps & FlowInjected) {
                 onClick={() => { void confirmAddHost() }}
               >
                 {hostPending !== null && <SpinnerIcon className={styles.spin} />}
-                添加并连接
+                {t("添加并连接")}
               </button>
             </div>
           </div>

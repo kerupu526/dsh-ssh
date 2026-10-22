@@ -11,6 +11,8 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { SshWorkspaceFlow } from './flow.tsx'
+import { NS, setTranslate } from './i18n.ts'
+import { en, ko } from './locales.ts'
 
 /** Local, self-contained wire contracts (no cross-plugin value imports). */
 export interface WireEntry {
@@ -84,6 +86,12 @@ declare module '@deepseek-ai/cordis' {
     'connection/reset'(): void
   }
   interface Context {
+    /** Client locale service (DSH client `dsh-client-locale`); absent on builds without it. */
+    locale?: {
+      /** Registers one language's dictionary; the returned function removes it. */
+      register(namespace: string, locale: string, dictionary: Record<string, string>): () => void
+      bind(namespace: string): (key: string) => string
+    }
     slots: {
       inject(key: string, callback: () => (() => void) | Iterable<() => void, void, void>): () => void
       register(options: { name: string; inject?: (...args: never[]) => Record<string, unknown> }, component: unknown): () => void
@@ -104,7 +112,7 @@ declare module '@deepseek-ai/cordis' {
  * resolved lazily because its key moved (`workspaces` → `uiWorkspace` in DSH
  * 0.2.0-rc.2), and because the current `workspaces` key is a different service.
  */
-export const inject = ['slots']
+export const inject = ['slots', 'locale']
 
 /**
  * The client service owning the directory-picker bridge
@@ -130,6 +138,14 @@ function directoryService(ctx: Context): ClientWorkspaces {
  * @param ctx - client root context.
  */
 export function apply(ctx: Context): void {
+  // Dictionaries: English and Korean; Chinese is the source text itself.
+  const locale = ctx.locale
+  if (locale !== undefined) {
+    ctx.effect(() => locale.register(NS, 'en', en), 'dsh-ssh: en dictionary')
+    ctx.effect(() => locale.register(NS, 'ko', ko), 'dsh-ssh: ko dictionary')
+    setTranslate(locale.bind(NS))
+  }
+
   const injected = (): Record<string, unknown> => {
     const connection = ctx.get('connection') as ClientConnection | undefined
     return {

@@ -23,6 +23,7 @@ import {
   SpinnerIcon,
 } from './icons.tsx'
 import styles from './flow.module.css'
+import { t } from './i18n.ts'
 
 /** One manual or resolved ProxyJump hop. */
 export interface JumpInput {
@@ -126,8 +127,8 @@ function formatSummary(resolved: ResolvedSshConfigView): string {
   const parts: string[] = []
   if (resolved.alias.toLowerCase() !== resolved.host.toLowerCase()) parts.push(`${resolved.alias} → ${endpoint}`)
   else parts.push(endpoint)
-  if (resolved.privateKeyPaths[0] !== undefined) parts.push(`私钥 ${resolved.privateKeyPaths[0] as string}`)
-  if (resolved.jump.length > 0) parts.push(`跳板 ${resolved.jump.map(formatHop).join(' → ')}`)
+  if (resolved.privateKeyPaths[0] !== undefined) parts.push(t("私钥 {0}", resolved.privateKeyPaths[0] as string))
+  if (resolved.jump.length > 0) parts.push(t("跳板 {0}", resolved.jump.map(formatHop).join(' → ')))
   return parts.join(' · ')
 }
 
@@ -179,15 +180,15 @@ export function ConnectionForm({ resolve, test, save, draft, locked, onClose, on
 
   const errors = (): FieldErrors => {
     const result: FieldErrors = {}
-    if (host.trim() === '') result.host = '请填写主机名或 ~/.ssh/config 别名'
+    if (host.trim() === '') result.host = t("请填写主机名或 ~/.ssh/config 别名")
     const portText = port.trim()
-    if (portText === '') result.port = '必填'
-    else if (!/^\d+$/.test(portText)) result.port = '端口必须是数字'
+    if (portText === '') result.port = t("必填")
+    else if (!/^\d+$/.test(portText)) result.port = t("端口必须是数字")
     else {
       const value = Number(portText)
-      if (value < 1 || value > 65535) result.port = '端口范围 1–65535'
+      if (value < 1 || value > 65535) result.port = t("端口范围 1–65535")
     }
-    if (username.trim() === '') result.username = '请填写登录用户名'
+    if (username.trim() === '') result.username = t("请填写登录用户名")
     return result
   }
 
@@ -250,7 +251,7 @@ export function ConnectionForm({ resolve, test, save, draft, locked, onClose, on
   const resolveConfig = async (): Promise<void> => {
     setRevealed(true)
     if (host.trim() === '') {
-      setFeedback({ kind: 'error', text: '请先填写主机名或 ~/.ssh/config 别名' })
+      setFeedback({ kind: 'error', text: t("请先填写主机名或 ~/.ssh/config 别名") })
       return
     }
     autoGeneration.current += 1
@@ -258,17 +259,17 @@ export function ConnectionForm({ resolve, test, save, draft, locked, onClose, on
     setAutoBusy(false)
     setBusy(true)
     setBusyTask('resolve')
-    setFeedback({ kind: 'info', text: '正在读取 ~/.ssh/config…' })
+    setFeedback({ kind: 'info', text: t("正在读取 ~/.ssh/config…") })
     try {
       const resolved = await resolve(host.trim())
       lastAutoHost.current = resolved.host
       applyResolved(resolved)
       setFeedback({
         kind: 'success',
-        text: `已识别 ${resolved.alias} → ${resolved.username !== '' ? `${resolved.username}@` : ''}${resolved.host}${resolved.port !== 22 ? `:${String(resolved.port)}` : ''}`,
+        text: t("已识别 {0} → {1}{2}{3}", resolved.alias, resolved.username !== '' ? `${resolved.username}@` : '', resolved.host, resolved.port !== 22 ? `:${String(resolved.port)}` : ''),
       })
     } catch (error) {
-      setFeedback({ kind: 'error', text: `识别失败：${error instanceof Error ? error.message : String(error)}` })
+      setFeedback({ kind: 'error', text: t("识别失败：{0}", error instanceof Error ? error.message : String(error)) })
     } finally {
       setBusy(false)
       setBusyTask(null)
@@ -279,27 +280,27 @@ export function ConnectionForm({ resolve, test, save, draft, locked, onClose, on
     setRevealed(true)
     const input = assemble()
     if (host.trim() === '') {
-      setFeedback({ kind: 'error', text: '请先填写主机名' })
+      setFeedback({ kind: 'error', text: t("请先填写主机名") })
       return
     }
     if (authKind === 'password' && input.password === undefined) {
-      setFeedback({ kind: 'error', text: '请填写密码，或改用私钥认证' })
+      setFeedback({ kind: 'error', text: t("请填写密码，或改用私钥认证") })
       return
     }
     if (authKind === 'key' && input.privateKeyPath === undefined) {
-      setFeedback({ kind: 'error', text: '请填写私钥文件路径，或改用密码认证' })
+      setFeedback({ kind: 'error', text: t("请填写私钥文件路径，或改用密码认证") })
       return
     }
     setBusy(true)
     setBusyTask('test')
-    setFeedback({ kind: 'info', text: '正在测试连接…' })
+    setFeedback({ kind: 'info', text: t("正在测试连接…") })
     try {
       const outcome = await test(input)
       setFeedback(outcome.ok
-        ? { kind: 'success', text: '连接成功，可以保存了' }
-        : { kind: 'error', text: `连接失败：${outcome.message ?? '未知错误'}` })
+        ? { kind: 'success', text: t("连接成功，可以保存了") }
+        : { kind: 'error', text: t("连接失败：{0}", outcome.message ?? '未知错误') })
     } catch (error) {
-      setFeedback({ kind: 'error', text: `测试失败：${error instanceof Error ? error.message : String(error)}` })
+      setFeedback({ kind: 'error', text: t("测试失败：{0}", error instanceof Error ? error.message : String(error)) })
     } finally {
       setBusy(false)
       setBusyTask(null)
@@ -310,22 +311,22 @@ export function ConnectionForm({ resolve, test, save, draft, locked, onClose, on
     setRevealed(true)
     const found = errors()
     if (found.host !== undefined || found.port !== undefined || found.username !== undefined) {
-      setFeedback({ kind: 'error', text: '请先补全上方必填项' })
+      setFeedback({ kind: 'error', text: t("请先补全上方必填项") })
       return
     }
     const input = assemble()
     setBusy(true)
     setBusyTask('save')
-    setFeedback({ kind: 'info', text: '正在保存…' })
+    setFeedback({ kind: 'info', text: t("正在保存…") })
     try {
       const outcome = await save(input)
       if (!outcome.ok || outcome.view === undefined) {
-        setFeedback({ kind: 'error', text: `保存失败：${outcome.message ?? '未知错误'}` })
+        setFeedback({ kind: 'error', text: t("保存失败：{0}", outcome.message ?? '未知错误') })
         return
       }
       onSaved(outcome.view)
     } catch (error) {
-      setFeedback({ kind: 'error', text: `保存失败：${error instanceof Error ? error.message : String(error)}` })
+      setFeedback({ kind: 'error', text: t("保存失败：{0}", error instanceof Error ? error.message : String(error)) })
     } finally {
       setBusy(false)
       setBusyTask(null)
@@ -338,24 +339,24 @@ export function ConnectionForm({ resolve, test, save, draft, locked, onClose, on
 
   return (
     <div className={styles.overlay} onClick={(event) => { if (event.target === event.currentTarget && !busy) onClose() }}>
-      <div className={styles.form} role="dialog" aria-modal="true" aria-label="新建远程连接" ref={dialogRef}>
+      <div className={styles.form} role="dialog" aria-modal="true" aria-label={t("新建远程连接")} ref={dialogRef}>
         <div className={styles.formHead}>
           <div className={styles.formHeadText}>
-            <h3 className={styles.formTitle}>新建远程连接</h3>
-            <p className={styles.formSub}>保存后将出现在连接侧栏中，可直接浏览其远程目录</p>
+            <h3 className={styles.formTitle}>{t("新建远程连接")}</h3>
+            <p className={styles.formSub}>{t("保存后将出现在连接侧栏中，可直接浏览其远程目录")}</p>
           </div>
-          <button type="button" className={styles.iconButton} aria-label="关闭" disabled={busy} onClick={onClose}>
+          <button type="button" className={styles.iconButton} aria-label={t("关闭")} disabled={busy} onClick={onClose}>
             <CloseIcon />
           </button>
         </div>
 
         <div className={styles.formGrid}>
           <label className={styles.field}>
-            <span className={styles.fieldLabel}>主机名 / 别名<span className={styles.required} aria-hidden>*</span></span>
+            <span className={styles.fieldLabel}>{t("主机名 / 别名")}<span className={styles.required} aria-hidden>*</span></span>
             <input
               className={cx(styles.input, hostError !== undefined && styles.inputError)}
               value={host}
-              placeholder="prod 或 server.example.com"
+              placeholder={t("prod 或 server.example.com")}
               disabled={busy}
               onChange={event => {
                 setHost(event.target.value)
@@ -368,9 +369,9 @@ export function ConnectionForm({ resolve, test, save, draft, locked, onClose, on
                 if (text.trim() !== '') void autoResolve(text)
               }}
             />
-            {autoBusy && <span className={styles.fieldHint} role="status">正在匹配 ~/.ssh/config…</span>}
+            {autoBusy && <span className={styles.fieldHint} role="status">{t("正在匹配 ~/.ssh/config…")}</span>}
             {hostError !== undefined && <span className={styles.fieldError}>{hostError}</span>}
-            <span className={styles.fieldHint}>填写 ~/.ssh/config 里的别名可在失焦时自动补全用户名、端口、私钥与跳板</span>
+            <span className={styles.fieldHint}>{t("填写 ~/.ssh/config 里的别名可在失焦时自动补全用户名、端口、私钥与跳板")}</span>
           </label>
 
           {resolveSummary !== null && (
@@ -382,7 +383,7 @@ export function ConnectionForm({ resolve, test, save, draft, locked, onClose, on
 
           <div className={styles.rowFields}>
             <label className={cx(styles.field, styles.fieldPort)}>
-              <span className={styles.fieldLabel}>端口<span className={styles.required} aria-hidden>*</span></span>
+              <span className={styles.fieldLabel}>{t("端口")}<span className={styles.required} aria-hidden>*</span></span>
               <input
                 className={cx(styles.input, portError !== undefined && styles.inputError)}
                 value={port}
@@ -393,7 +394,7 @@ export function ConnectionForm({ resolve, test, save, draft, locked, onClose, on
               {portError !== undefined && <span className={styles.fieldError}>{portError}</span>}
             </label>
             <label className={styles.field}>
-              <span className={styles.fieldLabel}>用户名<span className={styles.required} aria-hidden>*</span></span>
+              <span className={styles.fieldLabel}>{t("用户名")}<span className={styles.required} aria-hidden>*</span></span>
               <input
                 ref={usernameRef}
                 className={cx(styles.input, usernameError !== undefined && styles.inputError)}
@@ -407,17 +408,17 @@ export function ConnectionForm({ resolve, test, save, draft, locked, onClose, on
 
           <div className={styles.rowFields}>
             <label className={styles.field}>
-              <span className={styles.fieldLabel}>名称（可选）</span>
+              <span className={styles.fieldLabel}>{t("名称（可选）")}</span>
               <input
                 className={styles.input}
                 value={label}
-                placeholder="默认 user@host"
+                placeholder={t("默认 user@host")}
                 disabled={busy}
                 onChange={event => { setLabel(event.target.value) }}
               />
             </label>
             <label className={styles.field}>
-              <span className={styles.fieldLabel}>工作目录（可选）</span>
+              <span className={styles.fieldLabel}>{t("工作目录（可选）")}</span>
               <input
                 className={styles.input}
                 value={cwd}
@@ -429,7 +430,7 @@ export function ConnectionForm({ resolve, test, save, draft, locked, onClose, on
           </div>
 
           <div className={styles.fieldGroup}>
-            <span className={styles.fieldLabel} id="dsh-ssh-auth-label">认证方式</span>
+            <span className={styles.fieldLabel} id="dsh-ssh-auth-label">{t("认证方式")}</span>
             <div className={styles.segment} role="radiogroup" aria-labelledby="dsh-ssh-auth-label">
               <button
                 type="button"
@@ -440,7 +441,7 @@ export function ConnectionForm({ resolve, test, save, draft, locked, onClose, on
                 onClick={() => { setAuthKind('key') }}
               >
                 <KeyIcon />
-                私钥文件
+                {t("私钥文件")}
               </button>
               <button
                 type="button"
@@ -451,14 +452,14 @@ export function ConnectionForm({ resolve, test, save, draft, locked, onClose, on
                 onClick={() => { setAuthKind('password') }}
               >
                 <LockIcon />
-                密码
+                {t("密码")}
               </button>
             </div>
           </div>
 
           {authKind === 'key' ? (
             <label className={styles.field}>
-              <span className={styles.fieldLabel}>私钥文件路径</span>
+              <span className={styles.fieldLabel}>{t("私钥文件路径")}</span>
               <input
                 className={styles.input}
                 value={privateKeyPath}
@@ -469,7 +470,7 @@ export function ConnectionForm({ resolve, test, save, draft, locked, onClose, on
             </label>
           ) : (
             <label className={styles.field}>
-              <span className={styles.fieldLabel}>密码</span>
+              <span className={styles.fieldLabel}>{t("密码")}</span>
               <input
                 type="password"
                 className={styles.input}
@@ -482,7 +483,7 @@ export function ConnectionForm({ resolve, test, save, draft, locked, onClose, on
 
           {authKind === 'key' && (
             <label className={styles.field}>
-              <span className={styles.fieldLabel}>私钥口令（可选）</span>
+              <span className={styles.fieldLabel}>{t("私钥口令（可选）")}</span>
               <input
                 type="password"
                 className={styles.input}
@@ -494,15 +495,15 @@ export function ConnectionForm({ resolve, test, save, draft, locked, onClose, on
           )}
 
           <label className={styles.field}>
-            <span className={styles.fieldLabel}>跳板链（可选）</span>
+            <span className={styles.fieldLabel}>{t("跳板链（可选）")}</span>
             <input
               className={styles.input}
               value={jumpText}
-              placeholder="bastion 或 user@bastion.example.com:2202，多台用逗号分隔"
+              placeholder={t("bastion 或 user@bastion.example.com:2202，多台用逗号分隔")}
               disabled={busy}
               onChange={event => { setJumpText(event.target.value) }}
             />
-            <span className={styles.fieldHint}>支持 ~/.ssh/config 别名；格式 user@host:port，按连接顺序排列</span>
+            <span className={styles.fieldHint}>{t("支持 ~/.ssh/config 别名；格式 user@host:port，按连接顺序排列")}</span>
           </label>
         </div>
 
@@ -528,14 +529,14 @@ export function ConnectionForm({ resolve, test, save, draft, locked, onClose, on
         <div className={styles.formActions}>
           <button type="button" className={styles.button} disabled={busy || locked === true} onClick={() => { void resolveConfig() }}>
             <SparkIcon />
-            识别 ssh 配置
+            {t("识别 ssh 配置")}
           </button>
           <button type="button" className={styles.button} disabled={busy || locked === true} onClick={() => { void runTest() }}>
             <RouteIcon />
-            测试连接
+            {t("测试连接")}
           </button>
           <span className={styles.gap} />
-          <button type="button" className={styles.button} disabled={busy} onClick={onClose}>取消</button>
+          <button type="button" className={styles.button} disabled={busy} onClick={onClose}>{t("取消")}</button>
           <button
             type="button"
             className={cx(styles.button, styles.primary)}
@@ -543,7 +544,7 @@ export function ConnectionForm({ resolve, test, save, draft, locked, onClose, on
             onClick={() => { void runSave() }}
           >
             {busyTask === 'save' && <SpinnerIcon className={styles.spin} />}
-            保存连接
+            {t("保存连接")}
           </button>
         </div>
       </div>
