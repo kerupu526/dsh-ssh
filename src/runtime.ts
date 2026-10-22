@@ -252,6 +252,10 @@ function connectReady(client: Client, config: ConnectConfig): Promise<void> {
       client.removeListener('ready', onReady)
       client.removeListener('error', onError)
     }
+    // ssh2 emits 'error' for socket failures that happen after ready too (e.g. ECONNRESET).
+    // With no listener left, that becomes an uncaught exception that kills the whole DSH host.
+    // The once-listener below handles connect failures; this one keeps later errors contained.
+    client.on('error', () => undefined)
     client.once('ready', onReady)
     client.once('error', onError)
     client.connect(config)
