@@ -10,7 +10,8 @@
 import type { Context } from '@deepseek-ai/cordis'
 import SshRuntime from './runtime.ts'
 import type { Config } from './runtime.ts'
-import SshSubprocessRuntime from './subprocess.ts'
+import { installSshSubprocessRouting } from './subprocess-router.ts'
+import { installPresetCommands } from './preset-command.ts'
 import { installSshRouting } from './fs-router.ts'
 
 /**
@@ -20,6 +21,7 @@ import { installSshRouting } from './fs-router.ts'
  */
 export function apply(ctx: Context, config: Config): void {
   ctx.plugin(SshRuntime, config)
-  ctx.plugin(SshSubprocessRuntime)
+  ctx.plugin(installSshSubprocessRouting)
+  ctx.plugin(installPresetCommands)
   ctx.plugin(installSshRouting)
 }

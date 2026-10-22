@@ -29,13 +29,30 @@ const ROUTED_METHODS = [
   'writeText',
 ] as const
 
-/** True for an `ssh://` route, a local route placeholder, or a target key carrying either. */
-function isSshRef(value: unknown): boolean {
+/** Answers whether a registry connection with this id exists. */
+export type KnowsConnection = (id: string) => boolean
+
+/** Builds the registry lookup used to decide whether a placeholder names a live connection. */
+export function connectionLookup(ctx: Context): KnowsConnection {
+  return (id) => {
+    const registry = ctx.get('sshRegistry') as { get(id: string): unknown } | undefined
+    return registry?.get(id) !== undefined
+  }
+}
+
+/**
+ * True for an explicit `ssh://` route, or for a local route placeholder whose
+ * connection exists. A path under the placeholder root that names no live
+ * connection (for example `<root>/.git`) is an ordinary local path.
+ */
+export function isSshRef(value: unknown, knows: KnowsConnection): boolean {
   if (typeof value === 'string') {
-    return value.startsWith('ssh://') || parseSshTargetKey(value).connectionId !== undefined
+    if (value.startsWith('ssh://')) return true
+    const { connectionId } = parseSshTargetKey(value)
+    return connectionId !== undefined && knows(connectionId)
   }
   if (value !== null && typeof value === 'object' && 'targetKey' in value) {
-    return isSshRef((value as { targetKey: unknown }).targetKey)
+    return isSshRef((value as { targetKey: unknown }).targetKey, knows)
   }
   return false
 }
@@ -44,11 +61,11 @@ function isSshRef(value: unknown): boolean {
  * A call routes over SSH when its first argument names an SSH route, or when its
  * options carry an SSH `cwd` (relative paths resolve against that cwd).
  */
-function routesToSsh(args: unknown[]): boolean {
+function routesToSsh(args: unknown[], knows: KnowsConnection): boolean {
   const [first, second] = args
-  if (isSshRef(first)) return true
+  if (isSshRef(first, knows)) return true
   if (second !== null && typeof second === 'object' && 'cwd' in second) {
-    return isSshRef((second as { cwd: unknown }).cwd)
+    return isSshRef((second as { cwd: unknown }).cwd, knows)
   }
   return false
 }
@@ -63,6 +80,7 @@ export function installSshRouting(ctx: Context): void {
     const local = routed.fs as unknown as Record<string, unknown>
     const remote = new SshFileSystem(routed) as unknown as Record<string, unknown>
     const originals = new Map<string, unknown>()
+    const knows = connectionLookup(routed)
 
     for (const name of ROUTED_METHODS) {
       const localFn = local[name]
@@ -70,7 +88,7 @@ export function installSshRouting(ctx: Context): void {
       if (typeof localFn !== 'function' || typeof remoteFn !== 'function') continue
       originals.set(name, localFn)
       local[name] = (...args: unknown[]) => (
-        routesToSsh(args)
+        routesToSsh(args, knows)
           ? (remoteFn as (...a: unknown[]) => unknown).apply(remote, args)
           : (localFn as (...a: unknown[]) => unknown).apply(local, args)
       )

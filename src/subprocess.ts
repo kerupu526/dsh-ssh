@@ -9,7 +9,6 @@ import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, posix } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
-import { SubprocessRuntime } from '@deepseek-ai/dsh-subprocess'
 import type {
   SubprocessHandle,
   SubprocessSpawnSpec,
@@ -36,9 +35,12 @@ function requireRepresentableGrace(graceMs: number): void {
   }
 }
 
-/** SSH command manager registered as `ctx.subprocess`. */
-export class SshSubprocessRuntime extends SubprocessRuntime {
-  static inject = ['ssh']
+/**
+ * SSH command manager. It is deliberately NOT a Cordis service: `subprocess` is
+ * single-slot and DSH already mounts the local one, so `subprocess-router.ts`
+ * wraps that service and sends SSH-routed calls here.
+ */
+export class SshSubprocessRuntime {
 
   private readonly live = new Set<SshSubprocessHandle>()
   private readonly terminals = new Set<SshTerminalHandle>()
@@ -46,8 +48,7 @@ export class SshSubprocessRuntime extends SubprocessRuntime {
   private disposing = false
 
   /** Create the SSH subprocess service and bind its disposal policy. */
-  constructor(ctx: Context) {
-    super(ctx)
+  constructor(readonly ctx: Context) {
     ctx.effect(() => async () => {
       this.disposing = true
       const handles = [...this.live]
