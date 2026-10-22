@@ -11,7 +11,8 @@ import { Buffer } from 'node:buffer'
 import { posix } from 'node:path'
 import type { Readable } from 'node:stream'
 import type { SFTPWrapper, Stats } from 'ssh2'
-import { FileSystem, FsError, FsTargetKey, FsVersion } from '@deepseek-ai/dsh-fs'
+import type { Context } from '@deepseek-ai/cordis'
+import { FsError, FsTargetKey, FsVersion } from '@deepseek-ai/dsh-fs'
 import type {
   FsDirEntry,
   FsEditOutcome,
@@ -123,8 +124,13 @@ function literalEdit(content: string, request: FsEditRequest, displayPath: strin
 }
 
 /** Route-aware remote filesystem backend. */
-export class SshFileSystem extends FileSystem {
-  static inject = ['ssh']
+/**
+ * SSH filesystem backend. It is not a Cordis service: it does not register `fs`,
+ * so it can coexist with the local (sandboxed) `fs` provider. `fs-router.ts`
+ * sends calls whose path or cwd names an `ssh://` route here.
+ */
+export class SshFileSystem {
+  constructor(readonly ctx: Context) {}
 
   private readonly locks = new Map<string, Promise<unknown>>()
 
@@ -145,11 +151,15 @@ export class SshFileSystem extends FileSystem {
     return this.routeTarget(target).transport
   }
 
-  override async resolve(path: string, opts?: { cwd?: string; signal?: AbortSignal }): Promise<FsTarget> {
+  async resolve(path: string, opts?: { cwd?: string; signal?: AbortSignal }): Promise<FsTarget> {
     assertNotAborted(opts?.signal, 'resolve')
     if (path.trim().length === 0) throw new FsError('file_path must be a non-empty string', 'FS_NOT_FOUND')
-    const route = this.routeCwd(opts?.cwd)
-    const remotePath = posix.resolve(route.base, path)
+    // An embedded ssh:// path or placeholder names its own connection; otherwise the cwd decides.
+    const embedded = parseSshTargetKey(path)
+    const route = embedded.connectionId !== undefined
+      ? this.routeTarget({ targetKey: path } as unknown as FsTarget)
+      : this.routeCwd(opts?.cwd)
+    const remotePath = 'base' in route ? posix.resolve(route.base, path) : route.path
     const displayPath = route.connectionId === undefined ? remotePath : sshTargetKey(route.connectionId, remotePath)
     try {
       const canonical = await this.canonicalPath(remotePath, opts?.signal, route.transport)
@@ -161,17 +171,17 @@ export class SshFileSystem extends FileSystem {
     }
   }
 
-  override processPath(target: FsTarget): string {
+  processPath(target: FsTarget): string {
     return this.pathOf(target)
   }
 
-  override fileUrl(target: FsTarget): string {
+  fileUrl(target: FsTarget): string {
     const path = this.processPath(target)
     if (!posix.isAbsolute(path)) throw new Error(`fs-ssh: expected an absolute process path: ${JSON.stringify(path)}`)
     return `file://${path.split('/').map(segment => encodeURIComponent(segment)).join('/')}`
   }
 
-  override contains(parent: FsTarget, child: FsTarget): boolean {
+  contains(parent: FsTarget, child: FsTarget): boolean {
     const parentRoute = parseSshTargetKey(String(parent.targetKey))
     const childRoute = parseSshTargetKey(String(child.targetKey))
     if (parentRoute.connectionId !== childRoute.connectionId) return false
@@ -179,7 +189,7 @@ export class SshFileSystem extends FileSystem {
     return relative === '' || (relative !== '..' && !relative.startsWith('../') && !posix.isAbsolute(relative))
   }
 
-  override async stat(target: FsTarget, signal?: AbortSignal): Promise<FsInfo | undefined> {
+  async stat(target: FsTarget, signal?: AbortSignal): Promise<FsInfo | undefined> {
     assertNotAborted(signal, 'stat')
     const route = this.routeTarget(target)
     const stats = await this.probe(route.path, target.displayPath, signal, route.transport)
@@ -191,7 +201,7 @@ export class SshFileSystem extends FileSystem {
     }
   }
 
-  override async lstat(path: string, opts?: { cwd?: string }, signal?: AbortSignal): Promise<FsPathInfo | undefined> {
+  async lstat(path: string, opts?: { cwd?: string }, signal?: AbortSignal): Promise<FsPathInfo | undefined> {
     assertNotAborted(signal, 'lstat')
     if (path.trim().length === 0) throw new FsError('file_path must be a non-empty string', 'FS_NOT_FOUND')
     const route = this.routeCwd(opts?.cwd)
@@ -214,14 +224,14 @@ export class SshFileSystem extends FileSystem {
     }
   }
 
-  override async readText(target: FsTarget, signal?: AbortSignal): Promise<string> {
+  async readText(target: FsTarget, signal?: AbortSignal): Promise<string> {
     await this.requireRegular(target, signal)
     const bytes = await this.readBytesRaw(target, signal, Number.POSITIVE_INFINITY)
     assertNotAborted(signal, 'read')
     return decodeText(bytes, target.displayPath)
   }
 
-  override async readBytes(target: FsTarget, signal: AbortSignal | undefined, maxBytes: number): Promise<Uint8Array> {
+  async readBytes(target: FsTarget, signal: AbortSignal | undefined, maxBytes: number): Promise<Uint8Array> {
     const info = await this.requireRegular(target, signal)
     if (info.size !== undefined && info.size > maxBytes) {
       throw new FsError(`cannot read "${target.displayPath}": ${info.size} bytes exceeds the ${maxBytes}-byte limit`, 'FS_TOO_LARGE')
@@ -231,7 +241,7 @@ export class SshFileSystem extends FileSystem {
     return bytes
   }
 
-  override async readByteRange(
+  async readByteRange(
     target: FsTarget,
     range: { offset: number; length: number },
     signal?: AbortSignal,
@@ -259,7 +269,7 @@ export class SshFileSystem extends FileSystem {
     }
   }
 
-  override async streamText(target: FsTarget, signal?: AbortSignal): Promise<AsyncIterable<string>> {
+  async streamText(target: FsTarget, signal?: AbortSignal): Promise<AsyncIterable<string>> {
     await this.requireRegular(target, signal)
     const route = this.routeTarget(target)
     const sftp = await route.transport.getSftp()
@@ -297,7 +307,7 @@ export class SshFileSystem extends FileSystem {
     }
   }
 
-  override async listDir(target: FsTarget, signal?: AbortSignal): Promise<FsDirEntry[]> {
+  async listDir(target: FsTarget, signal?: AbortSignal): Promise<FsDirEntry[]> {
     const info = await this.stat(target, signal)
     if (info === undefined) throw new FsError(`cannot list "${target.displayPath}": not found`, 'FS_NOT_FOUND')
     if (info.type !== 'directory') throw new FsError(`cannot list "${target.displayPath}": not a directory`, 'FS_NOT_DIRECTORY')
@@ -329,7 +339,7 @@ export class SshFileSystem extends FileSystem {
     }
   }
 
-  override async writeText(
+  async writeText(
     target: FsTarget,
     content: string,
     expected?: FsWriteIntent,
@@ -353,7 +363,7 @@ export class SshFileSystem extends FileSystem {
     })
   }
 
-  override async editText(
+  async editText(
     target: FsTarget,
     edit: FsEditRequest,
     expected?: { version: ReturnType<typeof FsVersion> },

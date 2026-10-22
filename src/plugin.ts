@@ -11,7 +11,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import SshRuntime from './runtime.ts'
 import type { Config } from './runtime.ts'
 import SshSubprocessRuntime from './subprocess.ts'
-import SshFileSystem from './filesystem-final.ts'
+import { installSshRouting } from './fs-router.ts'
 
 /**
  * Mount the aggregate plugin.
@@ -21,5 +21,5 @@ import SshFileSystem from './filesystem-final.ts'
 export function apply(ctx: Context, config: Config): void {
   ctx.plugin(SshRuntime, config)
   ctx.plugin(SshSubprocessRuntime)
-  ctx.plugin(SshFileSystem)
+  ctx.plugin(installSshRouting)
 }
